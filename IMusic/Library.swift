@@ -23,7 +23,6 @@ struct Library: View {
                 GeometryReader { geometry in
                     HStack(spacing: 20) {
                         Button(action: {
-                            print("12345")
                             self.track = self.tracks[0]
                             self.tabBarDelegate?.maximizeTrackDetailController(viewModel: self.track)
                         }, label: {
@@ -50,7 +49,6 @@ struct Library: View {
                         LibraryCell(cell: track).gesture(
                             LongPressGesture()
                                 .onEnded { _ in
-                                    print("Pressed!")
                                     self.track = track
                                     self.showingAlert = true
                                 }
@@ -74,7 +72,6 @@ struct Library: View {
                 }
             }.actionSheet(isPresented: $showingAlert, content: {
                 ActionSheet(title: Text("Are you sure you want to delete this track?"), buttons: [.destructive(Text("Delete"), action: {
-                    print("Deleting: \(self.track.trackName)")
                     self.delete(track: self.track)
                 }), .cancel()
                 ])

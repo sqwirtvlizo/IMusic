@@ -27,7 +27,6 @@ class TrackCell: UITableViewCell {
         addTrackButton.isHidden = true
         var listOfTracks = UserDefaults.standard.savedTracks()
         listOfTracks.append(cell)
-        print(cell.previewUrl)
         
         if let savedData = try? NSKeyedArchiver.archivedData(withRootObject: listOfTracks, requiringSecureCoding: false) {
             defaults.set(savedData, forKey: UserDefaults.favouriteTrackKey)
