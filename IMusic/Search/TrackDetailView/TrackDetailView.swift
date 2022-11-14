@@ -1,0 +1,242 @@
+//
+//  TableDetailView.swift
+//  IMusic
+//
+//  Created by Евгений Кононенко on 10.11.2022.
+//  Copyright © 2022 Алексей Пархоменко. All rights reserved.
+//
+
+import UIKit
+import SDWebImage
+import AVKit
+
+protocol TrackMovingDelegate {
+    func movePrevious() -> SearchViewModel.Cell?
+    func moveNext() -> SearchViewModel.Cell?
+}
+
+class TrackDetailView: UIView {
+    
+    @IBOutlet weak var miniPlayPauseButton: UIButton!
+    @IBOutlet weak var miniTrackTitleLabel: UILabel!
+    @IBOutlet weak var miniTrackImageView: UIImageView!
+    @IBOutlet weak var maximizedStackView: UIStackView!
+    @IBOutlet weak var miniGoForwardButton: UIButton!
+    @IBOutlet weak var miniTrackView: UIView!
+    @IBOutlet weak var trackImageView: UIImageView!
+    @IBOutlet weak var currentTimeSlider: UISlider!
+    @IBOutlet weak var currentTimeLabel: UILabel!
+    @IBOutlet weak var durationTimeLabel: UILabel!
+    @IBOutlet weak var playPauseButton: UIButton!
+    @IBOutlet weak var authorLabel: UILabel!
+    @IBOutlet weak var titleLabel: UILabel!
+    @IBOutlet weak var nextTrackButton: UIButton!
+    @IBOutlet weak var backTrackButton: UIButton!
+    @IBOutlet weak var volumeSlider: UISlider!
+    
+    var delegate: TrackMovingDelegate?
+    weak var tabBarDelegate: MainTabBarControllerDelegate?
+    
+    let scale = 0.8
+    let player: AVPlayer = {
+        let pl = AVPlayer()
+        pl.automaticallyWaitsToMinimizeStalling = false
+        return pl
+    }()
+    
+    override func awakeFromNib() {
+        super.awakeFromNib()
+        trackImageView.transform = CGAffineTransform(scaleX: scale, y: scale)
+        trackImageView.layer.cornerRadius = 5
+        miniPlayPauseButton.imageEdgeInsets = .init(top: 9, left: 9, bottom: 9, right: 9)
+        setupGesture()
+    }
+    
+    private func playTrack(previewURL: String?) {
+        self.player.automaticallyWaitsToMinimizeStalling = false
+        guard let url = URL(string: previewURL ?? "") else { return }
+        let playerItem = AVPlayerItem(url: url)
+        self.player.replaceCurrentItem(with: playerItem)
+        self.player.play()
+        
+    }
+    
+ 
+    func set(viewModel: SearchViewModel.Cell) {
+        
+        miniTrackTitleLabel.text = viewModel.trackName
+        titleLabel.text = viewModel.trackName
+        authorLabel.text = viewModel.artistName
+        playTrack(previewURL: viewModel.previewUrl)
+        observePlayerCurrentTime()
+        monitorStartTime()
+        playPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+        miniPlayPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+        let str600 = viewModel.iconUrlString?.replacingOccurrences(of: "100x100", with: "600x600")
+        guard let url = URL(string: str600 ?? "") else { return }
+        trackImageView.sd_setImage(with: url)
+        miniTrackImageView.sd_setImage(with: url)
+    }
+    
+    private func enlargeImageTrackView() {
+        UIView.animate(withDuration: 1, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 1, options: .curveEaseInOut) {
+            self.trackImageView.transform = .identity
+        }
+    }
+    
+    private func reduceImageTrackView() {
+        UIView.animate(withDuration: 1, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 1, options: .curveEaseInOut) {
+            
+            self.trackImageView.transform = CGAffineTransform(scaleX: self.scale, y: self.scale)
+        }
+    }
+    
+    private func setupGesture() {
+        miniTrackView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTapMaximized)))
+        miniTrackView.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
+        addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handleDismissalPan)))
+    }
+    
+    @objc
+    private func handleDismissalPan(gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .changed:
+            handleDismissalPanChange(gesture: gesture)
+        case .ended:
+            handleDismissalPanEnd(gesture: gesture)
+        @unknown default:
+            print("default")
+        }
+    }
+    
+    @objc
+    private func  handleDismissalPanChange(gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.superview)
+        maximizedStackView.transform = CGAffineTransform(translationX: 0, y: translation.y)
+    }
+    
+    @objc
+    private func  handleDismissalPanEnd(gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.superview)
+        let velocity = gesture.velocity(in: self.superview)
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
+            self.transform = .identity
+            if translation.y > 50 {
+//                self.tabBarDelegate?.minimizeTrackDetailController()
+                self.tabBarDelegate?.minimizeTrackDetailController()
+                self.maximizedStackView.transform = .identity
+            }
+        }, completion: nil)
+    }
+    
+    @objc
+    private func handlePan(gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            print("Began")
+        case .changed:
+            handlePanChanged(gesture: gesture)
+        case .ended:
+            handlePanEnded(gesture: gesture)
+        @unknown default:
+            print("unknown default")
+        }
+    }
+    
+    private func handlePanChanged(gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.superview)
+        self.transform = CGAffineTransform(translationX: 0, y: translation.y)
+        
+        let newAlpha = 1 + translation.y / 200
+        self.miniTrackView.alpha = newAlpha < 0 ? 0 : newAlpha
+        self.maximizedStackView.alpha = -translation.y / 200
+    }
+    
+    private func handlePanEnded(gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.superview)
+        let velocity = gesture.velocity(in: self.superview)
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 1, options: .curveEaseOut, animations: {
+            self.transform = .identity
+            if translation.y < -200 || velocity.y < -500 {
+                self.tabBarDelegate?.maximizeTrackDetailController(viewModel: nil)
+            } else {
+                self.miniTrackView.alpha = 1
+                self.maximizedStackView.alpha = 0
+            }
+        }, completion: nil)
+    }
+    
+    @objc
+    private func handleTapMaximized() {
+        self.tabBarDelegate?.maximizeTrackDetailController(viewModel: nil)
+    }
+    
+    private func monitorStartTime() {
+        let time = CMTimeMake(value: 1, timescale: 3)
+        let times = [NSValue(time: time)]
+        player.addBoundaryTimeObserver(forTimes: times, queue: .main) { [weak self] in
+            self?.enlargeImageTrackView()
+        }
+    }
+    
+    @IBAction func dragDownButtonTapped(_ sender: Any) {
+        tabBarDelegate?.minimizeTrackDetailController()
+    }
+    
+    @IBAction func playPauseTapped(_ sender: UIButton) {
+        if player.timeControlStatus == .paused {
+            player.play()
+            sender.setImage(UIImage(named: "pause"), for: .normal)
+            enlargeImageTrackView()
+        } else {
+            player.pause()
+            sender.setImage(UIImage(named: "play"), for: .normal)
+            reduceImageTrackView()
+        }
+    }
+    
+    private func observePlayerCurrentTime() {
+        let interval = CMTimeMake(value: 1, timescale: 2)
+        player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            self?.currentTimeLabel.text = time.toDisplayString()
+            let durationTime = self?.player.currentItem?.duration
+            let currentDurationTime = ((durationTime ?? CMTimeMake(value: 1, timescale: 1)) - time).toDisplayString()
+            self?.durationTimeLabel.text = "-\(currentDurationTime)"
+            self?.updateCurrentTimeSlider()
+        }
+    }
+    
+    private func updateCurrentTimeSlider() {
+        let currentTimeSeconds = CMTimeGetSeconds(player.currentTime())
+        let durationSeconds = CMTimeGetSeconds(player.currentItem?.duration ?? CMTimeMake(value: 1, timescale: 1))
+        let percentage = currentTimeSeconds / durationSeconds
+        self.currentTimeSlider.value = Float(percentage)
+    }
+    
+    @IBAction func nextTrackTapped(_ sender: Any) {
+        let cellViewModel = delegate?.moveNext()
+        guard let cellInfo = cellViewModel else { return }
+        self.set(viewModel: cellInfo)
+    }
+    
+    @IBAction func previousTrackTapped(_ sender: Any) {
+        let cellViewModel = delegate?.movePrevious()
+        guard let cellInfo = cellViewModel else { return }
+        self.set(viewModel: cellInfo)
+    }
+    
+    @IBAction func handleVolumeSlider(_ sender: Any) {
+        player.volume = volumeSlider.value
+    }
+    
+    @IBAction func handleCurrentTimerSlider(_ sender: Any) {
+        let percentage = Float64(currentTimeSlider.value)
+        guard let duration = player.currentItem?.duration else { return }
+        let durationSeconds = CMTimeGetSeconds(duration)
+        let seekTimeSeconds = durationSeconds * percentage
+        let seekTime = CMTimeMakeWithSeconds(seekTimeSeconds, preferredTimescale: 1)
+        player.seek(to: seekTime)
+    }
+}
