@@ -118,15 +118,7 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let cellViewModel = searchViewModel.cells[indexPath.row]
-//        let window = UIApplication.shared.keyWindow
-//        let trackDetailsView: TrackDetailView = TrackDetailView.loadFromNib()
-//       // let trackDetailsView = Bundle.main.loadNibNamed("TrackDetailView", owner: self)?.first as! TrackDetailView
-//        trackDetailsView.delegate = self
-//        window?.addSubview(trackDetailsView)
-//        trackDetailsView.set(viewModel: cellViewModel)
         tabBarDelegate?.maximizeTrackDetailController(viewModel: cellViewModel)
-        
-        
     }
     
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
