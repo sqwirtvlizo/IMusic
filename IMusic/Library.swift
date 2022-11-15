@@ -43,7 +43,7 @@ struct Library: View {
                         })
                     }
                 }.padding().frame(height: 80)
-                
+                    .cornerRadius(10)
                 List {
                     ForEach(tracks) { track in
                         LibraryCell(cell: track).gesture(
@@ -74,10 +74,13 @@ struct Library: View {
                 ActionSheet(title: Text("Are you sure you want to delete this track?"), buttons: [.destructive(Text("Delete"), action: {
                     self.delete(track: self.track)
                 }), .cancel()
-                ])
+                                                                                                 ])
             })
-                .navigationBarTitle("Library")
+            //.cornerRadius(10)
+            
+            .navigationBarTitle("Library")
         }
+        
         
     }
     

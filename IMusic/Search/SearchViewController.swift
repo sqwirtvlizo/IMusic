@@ -13,11 +13,11 @@ protocol SearchDisplayLogic: AnyObject {
 }
 
 class SearchViewController: UIViewController, SearchDisplayLogic {
-
-  var interactor: SearchBusinessLogic?
-  var router: (NSObjectProtocol & SearchRoutingLogic)?
+    let uDefaults = UserDefaults.standard
+    var interactor: SearchBusinessLogic?
+    var router: (NSObjectProtocol & SearchRoutingLogic)?
     weak var tabBarDelegate: MainTabBarControllerDelegate?
-    
+    private var accessToSearch = false
     @IBOutlet weak var table: UITableView!
     
     let searchController = UISearchController(searchResultsController: nil)
@@ -25,35 +25,41 @@ class SearchViewController: UIViewController, SearchDisplayLogic {
     private var timer: Timer?
     
     private lazy var footerView = FooterView()
-      
-  // MARK: Setup
-  
-  private func setup() {
-    let viewController        = self
-    let interactor            = SearchInteractor()
-    let presenter             = SearchPresenter()
-    let router                = SearchRouter()
-    viewController.interactor = interactor
-    viewController.router     = router
-    interactor.presenter      = presenter
-    presenter.viewController  = viewController
-    router.viewController     = viewController
-  }
-  
-  // MARK: Routing
-  
-
-  
-  // MARK: View lifecycle
-  
-  override func viewDidLoad() {
-    super.viewDidLoad()
-    setup()
     
-    setupTableView()
-    setupSearchBar()
-  }
-
+    // MARK: Setup
+    
+    private func setup() {
+        let viewController        = self
+        let interactor            = SearchInteractor()
+        let presenter             = SearchPresenter()
+        let router                = SearchRouter()
+        viewController.interactor = interactor
+        viewController.router     = router
+        interactor.presenter      = presenter
+        presenter.viewController  = viewController
+        router.viewController     = viewController
+    }
+    
+    // MARK: Routing
+    
+    
+    
+    // MARK: View lifecycle
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setup()
+        searchController.searchBar.placeholder = "Artists, songs, texts..."
+        let attributes = [NSAttributedString.Key.foregroundColor : UIColor(red: 253/255, green: 45/255, blue: 85/255, alpha: 1)]
+        UIBarButtonItem.appearance(whenContainedInInstancesOf: [UISearchBar.self]).setTitleTextAttributes(attributes, for: .normal)
+       
+        if let text = uDefaults.string(forKey: "Last text") {
+            self.interactor?.makeRequest(request: Search.Model.Request.RequestType.getTracks(searchText: text))
+        }
+        setupTableView()
+        setupSearchBar()
+    }
+    
     override func viewWillAppear(_ animated: Bool) {
         let keyWindow = UIApplication.shared.connectedScenes.filter( {
             $0.activationState == .foregroundActive
@@ -80,19 +86,26 @@ class SearchViewController: UIViewController, SearchDisplayLogic {
         table.register(nib, forCellReuseIdentifier: TrackCell.reuseId)
         table.tableFooterView = footerView
     }
-  
-  func displayData(viewModel: Search.Model.ViewModel.ViewModelData) {
-
-    switch viewModel {
-    case .displayTracks(let searchViewModel):
-        self.searchViewModel = searchViewModel
-        table.reloadData()
-        footerView.hideLoader()
-    case .displayFooterView:
-        footerView.showLoader()
+    
+    func displayData(viewModel: Search.Model.ViewModel.ViewModelData) {
+        
+        switch viewModel {
+        case .displayTracks(let searchViewModel):
+            self.searchViewModel = searchViewModel
+            table.reloadData()
+            footerView.hideLoader()
+        case .displayFooterView:
+            footerView.showLoader()
+        }
     }
-  }
-  
+    
+    @objc
+    private func buttonTapped() {
+        uDefaults.removeObject(forKey: "Last text")
+        searchViewModel = SearchViewModel(cells: [])
+        table.reloadData()
+    }
+    
 }
 
 // MARK: - UITableViewDelegate, UITableViewDataSource
@@ -108,7 +121,7 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
         
         let cellViewModel = searchViewModel.cells[indexPath.row]
         cell.set(viewModel: cellViewModel)
-
+        
         return cell
     }
     
@@ -122,14 +135,40 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        let label = UILabel()
-        label.text = "Please enter search term above..."
-        label.textAlignment = .center
-        label.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
-        return label
+        let frame: CGRect = tableView.frame
+        let headerView: UIView = UIView(frame: CGRectMake(0, 0, frame.size.width, frame.size.height))
+        
+        
+        let button: UIButton = UIButton(frame: CGRectMake(frame.maxX - 129, frame.minY, 150, 50))
+        var label = UILabel(frame: CGRectMake(frame.minX + 21, frame.minY, 350, 50))
+        if let text = uDefaults.string(forKey: "Last text") {
+            label.text = "Last search results: " + text
+            button.setTitle("Clear", for: .normal)
+            button.setTitleColor(UIColor(red: 253/255, green: 45/255, blue: 85/255, alpha: 1), for: .normal)
+            button.addTarget(self, action: #selector(buttonTapped), for: .touchUpInside)
+            label.textAlignment = .left
+            headerView.addSubview(button)
+        } else {
+            
+//            label = UILabel(frame: CGRectMake(frame.minX + 21, 15, 150, 50)
+            label.text = "Please enter search term above..."
+            label.sizeToFit()
+            label.center = CGPoint(x: frame.width / 2, y: label.frame.size.height / 2)
+        }
+       
+        
+        label.textColor = .black
+        label.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        
+        headerView.addSubview(label)
+       
+        return headerView
     }
     
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        if let text = uDefaults.string(forKey: "Last text"), !accessToSearch {
+            return 50
+        }
         return searchViewModel.cells.count > 0 ? 0 : 250
     }
 }
@@ -138,12 +177,22 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
 
 extension SearchViewController: UISearchBarDelegate {
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-    
+        accessToSearch = true
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false, block: { (_) in
             self.interactor?.makeRequest(request: Search.Model.Request.RequestType.getTracks(searchText: searchText))
         })
-        
+    }
+    
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
+        if searchController.searchBar.text != "" && !searchViewModel.cells.isEmpty {
+            let uDefaults = UserDefaults.standard
+            uDefaults.set(searchController.searchBar.text, forKey: "Last text")
+        }
+//
+//        if searchViewModel.cells.isEmpty {
+//
+//        }
     }
 }
 

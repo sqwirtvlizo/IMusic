@@ -18,56 +18,8 @@ protocol TrackMovingDelegate {
 
 class TrackDetailView: UIView {
     
-    let commandCenter = MPRemoteCommandCenter.shared()
-    
-    func setupRemoteTransportControls() {
-        commandCenter.playCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
-            self?.player.play()
-            self?.playPauseButton.setImage(UIImage(named: "pause") , for: .normal)
-            self?.miniPlayPauseButton.setImage(UIImage(named: "pause") , for: .normal)
-            return .success
-        }
-        
-        commandCenter.changePlaybackPositionCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
-            guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            let seekTime = CMTimeMakeWithSeconds(positionEvent.positionTime, preferredTimescale: 1)
-            self?.player.seek(to: seekTime)
-            return .success
-        }
-        
-        commandCenter.pauseCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
-            self?.player.pause()
-         
-            self?.playPauseButton.setImage(UIImage(named: "play") , for: .normal)
-            self?.miniPlayPauseButton.setImage(UIImage(named: "play") , for: .normal)
-            return .success
-        }
-        commandCenter.previousTrackCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
-            self?.previousTrackTapped(self?.nextTrackButton)
-            return .success
-        }
-        commandCenter.nextTrackCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
-            self?.nextTrackTapped(self?.nextTrackButton)
-            return .success
-        }
-    }
-    func setupNowPlaying(viewModel: SearchViewModel.Cell, photo: UIImage? = nil) {
-        var nowPlayingInfo = [String : Any]()
-        nowPlayingInfo[MPMediaItemPropertyTitle] = viewModel.trackName
-        nowPlayingInfo[MPMediaItemPropertyArtist] = viewModel.artistName
-        nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = viewModel.collectionName
-        
-        if let photo = photo {
-            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: photo.size, requestHandler: { _  in
-                photo
-            })
-        }
-        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
-        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = player.currentItem!.asset.duration.seconds
-        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
-    }
-    
+    @IBOutlet weak var iconMaxVolume: UIImageView!
+    @IBOutlet weak var iconMinVolume: UIImageView!
     @IBOutlet weak var miniPlayPauseButton: UIButton!
     @IBOutlet weak var miniTrackTitleLabel: UILabel!
     @IBOutlet weak var miniTrackImageView: UIImageView!
@@ -87,8 +39,9 @@ class TrackDetailView: UIView {
     
     var delegate: TrackMovingDelegate?
     weak var tabBarDelegate: MainTabBarControllerDelegate?
+    private let commandCenter = MPRemoteCommandCenter.shared()
     
-    let scale = 0.8
+    private let scale = 0.8
     let player: AVPlayer = {
         let pl = AVPlayer()
         pl.automaticallyWaitsToMinimizeStalling = false
@@ -97,11 +50,24 @@ class TrackDetailView: UIView {
     
     override func awakeFromNib() {
         super.awakeFromNib()
-        trackImageView.transform = CGAffineTransform(scaleX: scale, y: scale)
-        trackImageView.layer.cornerRadius = 5
-        miniPlayPauseButton.imageEdgeInsets = .init(top: 9, left: 9, bottom: 9, right: 9)
+       
         setupGesture()
         setupRemoteTransportControls()
+        setForVisualView()
+        iconMinVolume.tintColor = .lightGray
+        iconMaxVolume.tintColor = .black
+    }
+    
+    private func setForVisualView() {
+        trackImageView.transform = CGAffineTransform(scaleX: scale, y: scale)
+        trackImageView.layer.cornerRadius = 5
+        trackImageView.layer.shadowOffset = CGSize(width: 0, height: 0)
+        trackImageView.layer.shadowRadius = 15
+        trackImageView.layer.shadowColor = UIColor.black.cgColor
+        trackImageView.layer.shadowOpacity = 15
+        miniPlayPauseButton.imageEdgeInsets = .init(top: 9, left: 9, bottom: 9, right: 9)
+        currentTimeSlider.transform = CGAffineTransform(translationX: 0.5, y: 0.5)
+        currentTimeSlider.setThumbImage(#imageLiteral(resourceName: "Knob"), for: .normal)
     }
     
     private func playTrack(previewURL: String?) {
@@ -112,7 +78,6 @@ class TrackDetailView: UIView {
         self.player.play()
     }
     
-    var ident = 0
     func set(viewModel: SearchViewModel.Cell) {
         let str600 = viewModel.iconUrlString?.replacingOccurrences(of: "100x100", with: "600x600")
         guard let url = URL(string: str600 ?? "") else { return }
@@ -124,21 +89,21 @@ class TrackDetailView: UIView {
         } catch _ {
             
         }
-        
         miniTrackTitleLabel.text = viewModel.trackName
         titleLabel.text = viewModel.trackName
         authorLabel.text = viewModel.artistName
         playTrack(previewURL: viewModel.previewUrl)
         observePlayerCurrentTime()
         monitorStartTime(viewModel: viewModel)
-        playPauseButton.setImage(UIImage(named: "pause") , for: .normal)
-        miniPlayPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+        playPauseButton.setImage(UIImage(systemName: "pause") , for: .normal)
+        miniPlayPauseButton.setImage(UIImage(systemName: "pause") , for: .normal)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
             setupNowPlaying(viewModel: viewModel,photo: miniTrackImageView.image)
         }
         trackImageView.sd_setImage(with: url)
     }
     
+    // MARK: Set image sizes
     private func enlargeImageTrackView() {
         UIView.animate(withDuration: 1, delay: 0, usingSpringWithDamping: 0.5, initialSpringVelocity: 1, options: .curveEaseInOut) {
             self.trackImageView.transform = .identity
@@ -151,6 +116,7 @@ class TrackDetailView: UIView {
         }
     }
     
+    // MARK: Set recognizes for view
     private func setupGesture() {
         miniTrackView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(handleTapMaximized)))
         miniTrackView.addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(handlePan)))
@@ -232,6 +198,7 @@ class TrackDetailView: UIView {
         self.tabBarDelegate?.maximizeTrackDetailController(viewModel: nil)
     }
     
+    // MARK: Monitor start time
     private func monitorStartTime(viewModel: SearchViewModel.Cell) {
         let time = CMTimeMake(value: 1, timescale: 3)
         let times = [NSValue(time: time)]
@@ -241,18 +208,20 @@ class TrackDetailView: UIView {
         }
     }
     
+    // MARK: Drag and down button handler
     @IBAction func dragDownButtonTapped(_ sender: Any) {
         tabBarDelegate?.minimizeTrackDetailController()
     }
     
+    // MARK: Play/Pause handler
     @IBAction func playPauseTapped(_ sender: UIButton) {
         if player.timeControlStatus == .paused {
             player.play()
-            sender.setImage(UIImage(named: "pause"), for: .normal)
+            sender.setImage(UIImage(systemName: "pause"), for: .normal)
             enlargeImageTrackView()
         } else {
             player.pause()
-            sender.setImage(UIImage(named: "play"), for: .normal)
+            sender.setImage(UIImage(systemName: "play"), for: .normal)
             reduceImageTrackView()
         }
     }
@@ -275,22 +244,35 @@ class TrackDetailView: UIView {
         self.currentTimeSlider.value = Float(percentage)
     }
     
+    // MARK: Next track handler
     @IBAction func nextTrackTapped(_ sender: Any) {
         let cellViewModel = delegate?.moveNext()
         guard let cellInfo = cellViewModel else { return }
         self.set(viewModel: cellInfo)
     }
     
+    
+    // MARK: Previous track handler
     @IBAction func previousTrackTapped(_ sender: Any) {
         let cellViewModel = delegate?.movePrevious()
         guard let cellInfo = cellViewModel else { return }
         self.set(viewModel: cellInfo)
     }
     
+    // MARK: Volume slider handler
     @IBAction func handleVolumeSlider(_ sender: Any) {
         player.volume = volumeSlider.value
+        if volumeSlider.value == 1 {
+            iconMaxVolume.tintColor = .black
+        } else if volumeSlider.value == 0 {
+            iconMinVolume.tintColor = .black
+        } else {
+            iconMinVolume.tintColor = .lightGray
+            iconMaxVolume.tintColor = .lightGray
+        }
     }
     
+    // MARK: Time slider handler
     @IBAction func handleCurrentTimerSlider(_ sender: Any) {
         let percentage = Float64(currentTimeSlider.value)
         guard let duration = player.currentItem?.duration else { return }
@@ -298,5 +280,53 @@ class TrackDetailView: UIView {
         let seekTimeSeconds = durationSeconds * percentage
         let seekTime = CMTimeMakeWithSeconds(seekTimeSeconds, preferredTimescale: 1)
         player.seek(to: seekTime)
+    }
+    
+    
+    // MARK: settings remoteControllers
+    func setupRemoteTransportControls() {
+        commandCenter.playCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
+            self?.player.play()
+            self?.playPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+            self?.miniPlayPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+            return .success
+        }
+        commandCenter.changePlaybackPositionCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
+            guard let positionEvent = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            let seekTime = CMTimeMakeWithSeconds(positionEvent.positionTime, preferredTimescale: 1)
+            self?.player.seek(to: seekTime)
+            return .success
+        }
+        commandCenter.pauseCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
+            self?.player.pause()
+         
+            self?.playPauseButton.setImage(UIImage(named: "play") , for: .normal)
+            self?.miniPlayPauseButton.setImage(UIImage(named: "play") , for: .normal)
+            return .success
+        }
+        commandCenter.previousTrackCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
+            self?.previousTrackTapped(self?.nextTrackButton)
+            return .success
+        }
+        commandCenter.nextTrackCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
+            self?.nextTrackTapped(self?.nextTrackButton)
+            return .success
+        }
+    }
+    
+    func setupNowPlaying(viewModel: SearchViewModel.Cell, photo: UIImage? = nil) {
+        var nowPlayingInfo = [String : Any]()
+        nowPlayingInfo[MPMediaItemPropertyTitle] = viewModel.trackName
+        nowPlayingInfo[MPMediaItemPropertyArtist] = viewModel.artistName
+        nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = viewModel.collectionName
+        if let photo = photo {
+            nowPlayingInfo[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: photo.size, requestHandler: { _  in
+                photo
+            })
+        }
+        nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = player.currentTime().seconds
+        nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = player.currentItem!.asset.duration.seconds
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
     }
 }

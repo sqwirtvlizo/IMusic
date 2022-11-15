@@ -21,13 +21,13 @@ class MainTabBarController: UITabBarController {
         view.backgroundColor = .white
         
         tabBar.tintColor = #colorLiteral(red: 1, green: 0, blue: 0.3776089847, alpha: 1)
-     //   tabBar.backgroundColor = UIColor(red: 0.098, green: 0.106, blue: 0.157, alpha: 0.05)
         tabBar.backgroundColor = #colorLiteral(red: 0.9531342387, green: 0.9490900636, blue: 0.9562709928, alpha: 1)
         tabBar.layer.shadowOffset = CGSize(width: 0, height: 0)
         tabBar.layer.shadowRadius = 2
         tabBar.layer.shadowColor = UIColor.black.cgColor
         tabBar.layer.shadowOpacity = 0.3
-//        tabBar.layer.cornerRadius
+        tabBar.layer.cornerRadius = 10
+        //        tabBar.layer.cornerRadius
         setupTrackDetailView()
         
         searchVC.tabBarDelegate = self
@@ -35,13 +35,13 @@ class MainTabBarController: UITabBarController {
         var library = Library()
         library.tabBarDelegate = self
         let hostVC = UIHostingController(rootView: library)
-        hostVC.tabBarItem.image = #imageLiteral(resourceName: "library 1")
+        hostVC.tabBarItem.image = UIImage(systemName: "book.closed")
         hostVC.tabBarItem.title = "Library"
         
         
         viewControllers = [
             hostVC,
-            generateViewController(rootViewController: searchVC, image: #imageLiteral(resourceName: "search"), title: "Search")
+            generateViewController(rootViewController: searchVC, image: UIImage(systemName: "magnifyingglass")!, title: "Search")
         ]
     }
     
