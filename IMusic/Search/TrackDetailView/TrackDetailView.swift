@@ -23,6 +23,8 @@ class TrackDetailView: UIView {
     func setupRemoteTransportControls() {
         commandCenter.playCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
             self?.player.play()
+            self?.playPauseButton.setImage(UIImage(named: "pause") , for: .normal)
+            self?.miniPlayPauseButton.setImage(UIImage(named: "pause") , for: .normal)
             return .success
         }
         
@@ -35,6 +37,9 @@ class TrackDetailView: UIView {
         
         commandCenter.pauseCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
             self?.player.pause()
+         
+            self?.playPauseButton.setImage(UIImage(named: "play") , for: .normal)
+            self?.miniPlayPauseButton.setImage(UIImage(named: "play") , for: .normal)
             return .success
         }
         commandCenter.previousTrackCommand.addTarget { [weak self] (event) -> MPRemoteCommandHandlerStatus in
